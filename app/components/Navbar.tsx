@@ -73,7 +73,7 @@ export default function Navbar() {
     <BSNavbar 
       expand="lg" 
       fixed="top"
-      className={`shadow-sm transition-all duration-300 ${scrolled ? 'py-2' : 'py-3'}`}
+      className={`shadow-sm transition-all  navbar-dark duration-300 ${scrolled ? 'py-2' : 'py-3'}`}
       style={{ 
         background: scrolled ? '#000000' : '#000000',
         transition: 'all 0.3s ease'
