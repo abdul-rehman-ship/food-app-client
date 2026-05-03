@@ -3,22 +3,15 @@ import { getToken, onMessage } from 'firebase/messaging';
 import { db } from './firebase';
 import { ref, update, get } from 'firebase/database';
 
-// Request notification permission and get token (manual trigger)
+// Request notification permission and get token (called by user click)
 export const requestNotificationPermission = async (userId: string) => {
   try {
-    // Check if browser supports notifications
     if (typeof window === 'undefined' || !('Notification' in window) || !messaging) {
       console.log('FCM not available in this environment');
       return null;
     }
 
-    // Check if permission is already granted
-    if (Notification.permission === 'granted') {
-      console.log('Notification permission already granted');
-      return await getAndStoreFCMToken(userId);
-    }
-
-    // Request permission
+    // Request permission (requires user interaction)
     const permission = await Notification.requestPermission();
     
     if (permission !== 'granted') {
@@ -34,59 +27,39 @@ export const requestNotificationPermission = async (userId: string) => {
   }
 };
 
-// Get and store FCM token (called automatically on login/signup)
+// Get and store FCM token (only if permission already granted)
 export const getAndStoreFCMToken = async (userId: string) => {
   try {
     console.log('getAndStoreFCMToken called for userId:', userId);
     
     if (typeof window === 'undefined') {
-      console.log('Not in browser environment');
       return null;
     }
 
-    if (!('Notification' in window)) {
-      console.log('This browser does not support notifications');
+    if (!('Notification' in window) || !messaging) {
+      console.log('FCM not available');
       return null;
     }
 
-    if (!messaging) {
-      console.log('Firebase Messaging not initialized');
-      return null;
-    }
-
-    // First, check if user already has a valid token in database
-    const userRef = ref(db, `users/${userId}`);
-    const snapshot = await get(userRef);
-    const existingToken = snapshot.val()?.fcmToken;
-    
-    if (existingToken) {
-      console.log('User already has FCM token, verifying...');
-      // You could optionally verify the token is still valid
-      return existingToken;
-    }
-
-    // Check permission status - don't auto-request, just check
+    // Check if permission is already granted
     if (Notification.permission !== 'granted') {
       console.log('Notification permission not granted. User needs to enable manually.');
-      console.log('Current permission status:', Notification.permission);
+      console.log('Current permission:', Notification.permission);
       return null;
     }
 
     // Get FCM token
-    console.log('Getting FCM token...');
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY
     });
 
     if (token) {
-      console.log('FCM token obtained successfully');
-      
       // Store token in user's record
+      const userRef = ref(db, `users/${userId}`);
       await update(userRef, {
         fcmToken: token,
         fcmTokenUpdatedAt: Date.now()
       });
-      
       console.log('FCM token stored successfully for user:', userId);
       return token;
     } else {
@@ -95,6 +68,18 @@ export const getAndStoreFCMToken = async (userId: string) => {
     }
   } catch (error) {
     console.error('Error getting FCM token:', error);
+    return null;
+  }
+};
+
+// Check if user has FCM token stored
+export const checkUserFCMToken = async (userId: string) => {
+  try {
+    const userRef = ref(db, `users/${userId}`);
+    const snapshot = await get(userRef);
+    return snapshot.val()?.fcmToken || null;
+  } catch (error) {
+    console.error('Error checking FCM token:', error);
     return null;
   }
 };

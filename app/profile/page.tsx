@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Spinner } from 'react-bootstrap';
-import { FaUser, FaEnvelope, FaPhone, FaSave, FaEdit, FaShoppingBag } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaPhone, FaSave, FaEdit, FaShoppingBag, FaBell } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { db, auth } from '../lib/firebase';
 import { ref, get, update } from 'firebase/database';
 import { updateProfile } from 'firebase/auth';
+import { requestNotificationPermission } from '../lib/fcm';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Link from 'next/link';
@@ -21,11 +22,12 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const { user, userData, isGuest, loading: authLoading } = useAuth();
+  const { user, userData, isGuest, loading: authLoading, refreshUserData, hasFCMToken } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [enablingNotifications, setEnablingNotifications] = useState(false);
   const [formData, setFormData] = useState<UserProfile>({
     fullName: '',
     email: '',
@@ -119,11 +121,38 @@ export default function ProfilePage() {
           status: updatedData.status || 'active'
         });
       }
+      
+      // Refresh auth context
+      if (refreshUserData) {
+        await refreshUserData();
+      }
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    if (!user) return;
+    
+    setEnablingNotifications(true);
+    try {
+      const token = await requestNotificationPermission(user.uid);
+      if (token) {
+        toast.success('Notifications enabled! You will receive order updates.');
+        if (refreshUserData) {
+          await refreshUserData();
+        }
+      } else {
+        toast.error('Could not enable notifications. Please allow notification permission in your browser settings.');
+      }
+    } catch (error) {
+      console.error('Error enabling notifications:', error);
+      toast.error('Failed to enable notifications');
+    } finally {
+      setEnablingNotifications(false);
     }
   };
 
@@ -246,7 +275,37 @@ export default function ProfilePage() {
                         </Col>
                       </Row>
 
-                      <div className="mt-3 pt-3 border-top">
+                      {/* Notifications Section */}
+                      <div className="mt-3 pt-2 border-top">
+                        {!hasFCMToken ? (
+                          <>
+                            <Button 
+                              variant="outline-primary"
+                              onClick={handleEnableNotifications}
+                              disabled={enablingNotifications}
+                              className="w-100 d-flex align-items-center justify-content-center gap-2"
+                              style={{ borderRadius: '12px' }}
+                            >
+                              {enablingNotifications ? (
+                                <Spinner animation="border" size="sm" />
+                              ) : (
+                                <FaBell size={16} />
+                              )}
+                              {enablingNotifications ? 'Enabling...' : 'Enable Notifications'}
+                            </Button>
+                            <small className="text-muted d-block text-center mt-2">
+                              Get real-time updates about your order status
+                            </small>
+                          </>
+                        ) : (
+                          <div className="d-flex align-items-center justify-content-center gap-2 text-success">
+                            <FaBell size={16} />
+                            <small>Notifications are enabled</small>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 pt-2 border-top">
                         <Link href="/orders" className="text-decoration-none">
                           <Button 
                             variant="outline-dark"
