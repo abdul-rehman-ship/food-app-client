@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { ref, set, get, update } from 'firebase/database';
-import { checkUserFCMToken } from '../lib/fcm';
+import { getAndStoreFCMToken, requestNotificationPermission } from '../lib/fcm';
 import toast from 'react-hot-toast';
 
 interface UserData {
@@ -68,6 +68,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Auto request notification permission after login
+  const autoRequestNotificationPermission = async (userId: string) => {
+    try {
+      // Small delay to ensure everything is loaded
+      setTimeout(async () => {
+        const token = await requestNotificationPermission(userId);
+        if (token) {
+          console.log('Auto notification permission granted and token stored');
+          await refreshUserData();
+        } else {
+          console.log('Auto notification permission denied or skipped');
+        }
+      }, 1000);
+    } catch (error) {
+      console.error('Auto notification permission error:', error);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -82,9 +100,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const existingUserData = snapshot.val();
           setUserData(existingUserData);
           setHasFCMToken(!!existingUserData.fcmToken);
+          
+          // Auto request notification permission if no token exists
+          if (!existingUserData.fcmToken) {
+            await autoRequestNotificationPermission(firebaseUser.uid);
+          }
         } else {
           setUserData(null);
           setHasFCMToken(false);
+          // Auto request notification permission for new users
+          await autoRequestNotificationPermission(firebaseUser.uid);
         }
       } else {
         // Check for guest session
@@ -110,6 +135,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       toast.success('Login successful!');
+      // Auto request notification permission after login
+      await autoRequestNotificationPermission(result.user.uid);
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -130,6 +157,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       await set(ref(db, `users/${result.user.uid}`), userData);
       toast.success('Account created successfully!');
+      // Auto request notification permission after signup
+      await autoRequestNotificationPermission(result.user.uid);
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -157,6 +186,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       toast.success('Google login successful!');
+      // Auto request notification permission after Google login
+      await autoRequestNotificationPermission(googleUser.uid);
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -186,6 +217,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUserData(null);
         toast.success('Logged out successfully');
       } else {
+        // Remove FCM token before logout
+        if (user) {
+          const userRef = ref(db, `users/${user.uid}`);
+          await update(userRef, { fcmToken: null });
+        }
         await signOut(auth);
         toast.success('Logged out successfully');
       }
