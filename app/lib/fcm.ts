@@ -3,7 +3,21 @@ import { getToken, onMessage } from 'firebase/messaging';
 import { db } from './firebase';
 import { ref, update, get } from 'firebase/database';
 
-// Request notification permission and get token (called by user click)
+// Register service worker
+const registerServiceWorker = async () => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('Service Worker registered successfully:', registration);
+    return registration;
+  } catch (error) {
+    console.error('Service Worker registration failed:', error);
+    return null;
+  }
+};
+
+// Request notification permission and get token (manual trigger)
 export const requestNotificationPermission = async (userId: string) => {
   try {
     if (typeof window === 'undefined' || !('Notification' in window) || !messaging) {
@@ -11,7 +25,14 @@ export const requestNotificationPermission = async (userId: string) => {
       return null;
     }
 
-    // Request permission (requires user interaction)
+    // Register service worker first
+    const registration = await registerServiceWorker();
+    if (!registration) {
+      console.log('Service Worker registration failed');
+      return null;
+    }
+
+    // Request permission
     const permission = await Notification.requestPermission();
     
     if (permission !== 'granted') {
@@ -27,7 +48,7 @@ export const requestNotificationPermission = async (userId: string) => {
   }
 };
 
-// Get and store FCM token (only if permission already granted)
+// Get and store FCM token
 export const getAndStoreFCMToken = async (userId: string) => {
   try {
     console.log('getAndStoreFCMToken called for userId:', userId);
@@ -41,24 +62,40 @@ export const getAndStoreFCMToken = async (userId: string) => {
       return null;
     }
 
-    // Check if permission is already granted
+    // Check if user already has a token in database
+    const userRef = ref(db, `users/${userId}`);
+    const snapshot = await get(userRef);
+    const existingToken = snapshot.val()?.fcmToken;
+    
+    if (existingToken) {
+      console.log('User already has FCM token');
+      return existingToken;
+    }
+
+    // Check permission
     if (Notification.permission !== 'granted') {
-      console.log('Notification permission not granted. User needs to enable manually.');
-      console.log('Current permission:', Notification.permission);
+      console.log('Notification permission not granted');
       return null;
     }
 
-    // Get FCM token
+    // Ensure service worker is registered
+    let registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+    if (!registration) {
+      registration = await registerServiceWorker();
+    }
+
+    // Get FCM token with service worker registration
     const token = await getToken(messaging, {
-      vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY
+      vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
+      serviceWorkerRegistration: registration
     });
 
     if (token) {
       // Store token in user's record
-      const userRef = ref(db, `users/${userId}`);
       await update(userRef, {
         fcmToken: token,
-        fcmTokenUpdatedAt: Date.now()
+        fcmTokenUpdatedAt: Date.now(),
+        fcmTokenSource: 'vercel'
       });
       console.log('FCM token stored successfully for user:', userId);
       return token;
@@ -72,19 +109,7 @@ export const getAndStoreFCMToken = async (userId: string) => {
   }
 };
 
-// Check if user has FCM token stored
-export const checkUserFCMToken = async (userId: string) => {
-  try {
-    const userRef = ref(db, `users/${userId}`);
-    const snapshot = await get(userRef);
-    return snapshot.val()?.fcmToken || null;
-  } catch (error) {
-    console.error('Error checking FCM token:', error);
-    return null;
-  }
-};
-
-// Remove FCM token from user (on logout)
+// Remove FCM token from user
 export const removeFCMToken = async (userId: string) => {
   try {
     const userRef = ref(db, `users/${userId}`);
@@ -95,6 +120,18 @@ export const removeFCMToken = async (userId: string) => {
     console.log('FCM token removed for user:', userId);
   } catch (error) {
     console.error('Error removing FCM token:', error);
+  }
+};
+
+// Check if user has FCM token
+export const checkUserFCMToken = async (userId: string) => {
+  try {
+    const userRef = ref(db, `users/${userId}`);
+    const snapshot = await get(userRef);
+    return snapshot.val()?.fcmToken || null;
+  } catch (error) {
+    console.error('Error checking FCM token:', error);
+    return null;
   }
 };
 
