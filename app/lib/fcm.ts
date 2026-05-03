@@ -4,8 +4,8 @@ import { db } from './firebase';
 import { ref, update, get } from 'firebase/database';
 
 // Register service worker
-const registerServiceWorker = async () => {
-  if (typeof window === 'undefined') return null;
+const registerServiceWorker = async (): Promise<ServiceWorkerRegistration | undefined> => {
+  if (typeof window === 'undefined') return undefined;
   
   try {
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
@@ -13,7 +13,7 @@ const registerServiceWorker = async () => {
     return registration;
   } catch (error) {
     console.error('Service Worker registration failed:', error);
-    return null;
+    return undefined;
   }
 };
 
@@ -84,10 +84,10 @@ export const getAndStoreFCMToken = async (userId: string) => {
       registration = await registerServiceWorker();
     }
 
-    // Get FCM token with service worker registration
+    // Get FCM token - fix TypeScript error by converting null to undefined
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
-      serviceWorkerRegistration: registration
+      serviceWorkerRegistration: registration ?? undefined
     });
 
     if (token) {
