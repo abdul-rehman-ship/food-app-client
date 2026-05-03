@@ -12,7 +12,8 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 import { auth, db, googleProvider } from '../lib/firebase';
-import { ref, set, get } from 'firebase/database';
+import { ref, set, get, update } from 'firebase/database';
+import { getAndStoreFCMToken } from '../lib/fcm';
 import toast from 'react-hot-toast';
 
 interface UserData {
@@ -22,6 +23,7 @@ interface UserData {
   mobileNumber: string;
   registeredAt: number;
   status: string;
+  fcmToken?: string;
 }
 
 interface AuthContextType {
@@ -50,22 +52,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
-  // Add state for favorites count
-const [favoritesCount, setFavoritesCount] = useState(0);
 
-// Add function to fetch favorites count
-const fetchFavoritesCount = async () => {
-  if (!user) return;
-  const snapshot = await get(ref(db, `favorites/${user.uid}`));
-  setFavoritesCount(snapshot.exists() ? Object.keys(snapshot.val()).length : 0);
-};
-
-// Call it when user logs in
-useEffect(() => {
-  if (user) {
-    fetchFavoritesCount();
-  }
-}, [user]);
+  // Auto store FCM token for authenticated user
+  const autoStoreFCMToken = async (userId: string) => {
+    try {
+      await getAndStoreFCMToken(userId);
+    } catch (error) {
+      console.error('Error auto-storing FCM token:', error);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -79,6 +74,9 @@ useEffect(() => {
         if (snapshot.exists()) {
           setUserData(snapshot.val());
         }
+        
+        // Auto store FCM token after login
+        await autoStoreFCMToken(firebaseUser.uid);
       } else {
         // Check for guest session
         const guestData = localStorage.getItem('guest_session');
@@ -100,6 +98,7 @@ useEffect(() => {
   const login = async (email: string, password: string) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
+      await autoStoreFCMToken(result.user.uid);
       toast.success('Login successful!');
     } catch (error: any) {
       toast.error(error.message);
@@ -120,6 +119,7 @@ useEffect(() => {
       };
       
       await set(ref(db, `users/${result.user.uid}`), userData);
+      await autoStoreFCMToken(result.user.uid);
       toast.success('Account created successfully!');
     } catch (error: any) {
       toast.error(error.message);
@@ -147,6 +147,7 @@ useEffect(() => {
         await set(userRef, userData);
       }
       
+      await autoStoreFCMToken(user.uid);
       toast.success('Google login successful!');
     } catch (error: any) {
       toast.error(error.message);
@@ -177,6 +178,11 @@ useEffect(() => {
         setUserData(null);
         toast.success('Logged out successfully');
       } else {
+        // Remove FCM token before logout
+        if (user) {
+          const userRef = ref(db, `users/${user.uid}`);
+          await update(userRef, { fcmToken: null });
+        }
         await signOut(auth);
         toast.success('Logged out successfully');
       }

@@ -116,7 +116,7 @@ export default function AboutPage() {
                 <p className="lead mb-0 fs-4">
                   Discover the heart and soul behind Bertha's Food
                 </p>
-                <div className="mt-4">
+                {/* <div className="mt-4">
                   <Image 
                     src="/headliner.png" 
                     alt="Bertha's Food" 
@@ -124,7 +124,7 @@ export default function AboutPage() {
                     height={170}
                     style={{ objectFit: 'contain' }}
                   />
-                </div>
+                </div> */}
               </Col>
             </Row>
           </Container>
@@ -132,7 +132,7 @@ export default function AboutPage() {
 
         <Container className="py-4">
           {/* Stats Section */}
-          <Row className="g-4 mb-5">
+          {/* <Row className="g-4 mb-5">
             <Col md={3}>
               <Card className="border-0 shadow-sm text-center h-100" style={{ borderRadius: '20px' }}>
                 <Card.Body className="p-4">
@@ -201,7 +201,7 @@ export default function AboutPage() {
                 </Card.Body>
               </Card>
             </Col>
-          </Row>
+          </Row> */}
 
           {/* Business Hours, Contact, Location Row */}
           <Row className="g-4 mb-5">

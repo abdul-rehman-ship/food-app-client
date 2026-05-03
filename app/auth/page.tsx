@@ -98,7 +98,7 @@ export default function AuthPage() {
               
               <Card.Body className="p-5">
                 <div className="text-center mb-4">
-                  <div className="mx-auto mb-3 d-flex align-items-center justify-content-center"
+                  {/* <div className="mx-auto mb-3 d-flex align-items-center justify-content-center"
                     style={{ 
                       width: '80px', 
                       height: '80px', 
@@ -107,7 +107,7 @@ export default function AuthPage() {
                       boxShadow: '0 10px 25px rgba(107,12,18,0.2)'
                     }}>
                     <Image src="/logo.png" alt="Logo" width={50} height={50} />
-                  </div>
+                  </div> */}
                   <h2 className="fw-bold" style={{ 
                     background: 'linear-gradient(135deg, #6b0c12, #ff6b35)',
                     WebkitBackgroundClip: 'text',

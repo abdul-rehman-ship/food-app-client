@@ -3,13 +3,14 @@
 import { Navbar as BSNavbar, Nav, Container, Button, Badge } from 'react-bootstrap';
 import { FaUser, FaShoppingCart, FaSignOutAlt, FaUserPlus, FaUtensils, FaInfoCircle, FaUserCircle, FaHeart } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
+import { FaBox } from 'react-icons/fa';
 import { useCart } from '../contexts/CartContext';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
 import { ref, get } from 'firebase/database';
 import { favoritesEvents } from '../utils/event';
-
+import { FaTruck } from 'react-icons/fa';
 export default function Navbar() {
   const { user, userData, isGuest, logout } = useAuth();
   const { totalItems } = useCart();
@@ -182,6 +183,53 @@ export default function Navbar() {
               )}
             </Button>
             
+<Button
+  variant="link"
+  onClick={() => router.push('/orders')}
+  className={`d-flex align-items-center gap-2 px-3 py-2 text-decoration-none nav-link-custom ${isActive('/orders') ? 'active-custom' : ''}`}
+  style={{ 
+    borderRadius: '10px',
+    color: '#ffffff',
+    transition: 'all 0.3s ease',
+    background: 'transparent',
+    border: 'none',
+    fontFamily: "'Poppins', sans-serif"
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.backgroundColor = 'rgba(107, 12, 18, 0.8)';
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.backgroundColor = 'transparent';
+  }}
+>
+  <FaBox size={16} />
+  Orders
+</Button>
+
+
+<Button
+  variant="link"
+  onClick={() => router.push('/trailors')}
+  className={`d-flex align-items-center gap-2 px-3 py-2 text-decoration-none nav-link-custom ${isActive('/trailors') ? 'active-custom' : ''}`}
+  style={{ 
+    borderRadius: '10px',
+    color: '#ffffff',
+    transition: 'all 0.3s ease',
+    background: 'transparent',
+    border: 'none',
+    fontFamily: "'Poppins', sans-serif"
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.backgroundColor = 'rgba(107, 12, 18, 0.8)';
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.backgroundColor = 'transparent';
+  }}
+>
+  <FaTruck size={16} />
+  Trailors
+</Button>
+            
             {/* Favorites Button - Only show for logged-in users */}
             {user && !isGuest && (
               <Button
@@ -245,20 +293,11 @@ export default function Navbar() {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <FaUserCircle size={14} />
+                    <FaUserCircle size={16} />
                     Profile
                   </Button>
                 )}
 
-                <div className="d-flex align-items-center gap-2 ms-2 px-3 py-1" style={{ 
-                  background: 'rgba(255,255,255,0.1)',
-                  borderRadius: '10px'
-                }}>
-                  <FaUser size={14} color="#ffffff" />
-                  <span className="text-white small" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                    {isGuest ? 'Guest' : userData?.fullName?.split(' ')[0] || 'User'}
-                  </span>
-                </div>
                 
                 {/* Logout Button */}
                 <Button 
@@ -282,7 +321,7 @@ export default function Navbar() {
                     e.currentTarget.style.borderColor = '#6b0c12';
                   }}
                 >
-                  <FaSignOutAlt size={14} />
+                  <FaSignOutAlt size={16} />
                   Logout
                 </Button>
               </>

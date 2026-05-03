@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Badge, Modal, Form, InputGroup } from 'react-bootstrap';
-import { FaShoppingCart, FaClock, FaUtensils, FaPlus, FaMinus, FaSearch, FaHeart, FaRegHeart } from 'react-icons/fa';
+import { Container, Row, Col, Card, Button, Spinner, Badge, Modal, Form, InputGroup, Carousel } from 'react-bootstrap';
+import { FaShoppingCart, FaClock, FaUtensils, FaPlus, FaMinus, FaSearch, FaHeart, FaRegHeart, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { db } from './lib/firebase';
-import { ref, get, set, remove, update } from 'firebase/database';
+import { ref, get, set, remove } from 'firebase/database';
 import { useAuth } from './contexts/AuthContext';
 import { useCart } from './contexts/CartContext';
 import toast from 'react-hot-toast';
@@ -58,9 +58,8 @@ export default function HomePage() {
       const foodData: FoodItem[] = [];
       foodSnapshot.forEach((child) => {
         const item = { id: child.key, ...child.val() };
-        if (item.stock > 0) {
-          foodData.push(item);
-        }
+        // Show all items regardless of stock (but you can filter if needed)
+        foodData.push(item);
       });
       
       const catData: Category[] = [];
@@ -95,50 +94,42 @@ export default function HomePage() {
     }
   };
 
-// Add import at the top
-
-
-// Update the toggleFavorite function
-const toggleFavorite = async (foodId: string) => {
-  if (isGuest) {
-    toast.error('Please login to add favorites');
-    router.push('/auth');
-    return;
-  }
-
-  if (!user) return;
-
-  setFavoritesLoading(true);
-  try {
-    const favoriteRef = ref(db, `favorites/${user.uid}/${foodId}`);
-    const snapshot = await get(favoriteRef);
-    
-    if (snapshot.exists()) {
-      // Remove from favorites
-      await remove(favoriteRef);
-      setFavorites(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(foodId);
-        return newSet;
-      });
-      toast.success('Removed from favorites');
-      // Dispatch event to update navbar badge
-      favoritesEvents.dispatch();
-    } else {
-      // Add to favorites
-      await set(favoriteRef, true);
-      setFavorites(prev => new Set([...prev, foodId]));
-      toast.success('Added to favorites');
-      // Dispatch event to update navbar badge
-      favoritesEvents.dispatch();
+  const toggleFavorite = async (foodId: string) => {
+    if (isGuest) {
+      toast.error('Please login to add favorites');
+      router.push('/auth');
+      return;
     }
-  } catch (error) {
-    console.error('Error toggling favorite:', error);
-    toast.error('Failed to update favorites');
-  } finally {
-    setFavoritesLoading(false);
-  }
-};
+
+    if (!user) return;
+
+    setFavoritesLoading(true);
+    try {
+      const favoriteRef = ref(db, `favorites/${user.uid}/${foodId}`);
+      const snapshot = await get(favoriteRef);
+      
+      if (snapshot.exists()) {
+        await remove(favoriteRef);
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(foodId);
+          return newSet;
+        });
+        toast.success('Removed from favorites');
+        favoritesEvents.dispatch();
+      } else {
+        await set(favoriteRef, true);
+        setFavorites(prev => new Set([...prev, foodId]));
+        toast.success('Added to favorites');
+        favoritesEvents.dispatch();
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorites');
+    } finally {
+      setFavoritesLoading(false);
+    }
+  };
 
   const filterItems = () => {
     let filtered = [...foodItems];
@@ -157,20 +148,21 @@ const toggleFavorite = async (foodId: string) => {
     setFilteredItems(filtered);
   };
 
-  const handleAddToBucket = (item: FoodItem) => {
+  const handleAddToBucket = (item: FoodItem, selectedSizeObj?: Size) => {
     if (isGuest) {
       toast.error('Please login or signup to add items to bucket');
       router.push('/auth');
       return;
     }
     
-    if (item.sizes && item.sizes.length > 0) {
+    if (item.sizes && item.sizes.length > 0 && !selectedSizeObj) {
       setSelectedItem(item);
       setSelectedSize(null);
       setQuantity(1);
       setShowSizeModal(true);
     } else {
-      addToCart(item.id!, 'Regular', 1);
+      const sizeToUse = selectedSizeObj || { name: 'Regular', price: item.price };
+      addToCart(item.id!, sizeToUse.name, 1);
     }
   };
 
@@ -213,7 +205,7 @@ const toggleFavorite = async (foodId: string) => {
     <>
       <Navbar />
       <div style={{ background: '#f8f9fa', minHeight: '100vh', paddingTop: '80px' }}>
-        {/* Hero Section with Image */}
+        {/* Hero Section */}
         <div className="position-relative text-white" style={{ 
           background: 'linear-gradient(135deg, #6b0c12, #8f1018)',
           padding: '60px 0',
@@ -343,34 +335,52 @@ const toggleFavorite = async (foodId: string) => {
               {filteredItems.map((item) => (
                 <Col key={item.id} md={6} lg={4} xl={3}>
                   <Card className="border-0 shadow-sm h-100" style={{ borderRadius: '20px', overflow: 'hidden', transition: 'all 0.3s' }}>
-                    {/* Image Section with Favorite Button */}
+                    {/* Image Carousel Section */}
                     <div style={{ position: 'relative' }}>
-                      <div 
-                        style={{ height: '220px', overflow: 'hidden', cursor: 'pointer' }}
-                        onClick={() => handleViewDetails(item)}
-                      >
-                        {item.images?.[0] ? (
-                          <img
-                            src={item.images[0]}
-                            alt={item.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <div className="h-100 d-flex align-items-center justify-content-center bg-light">
-                            <FaUtensils size={60} className="text-muted" />
-                          </div>
-                        )}
-                        {item.sizes && item.sizes.length > 0 && (
-                          <Badge 
-                            className="position-absolute top-0 end-0 m-2"
-                            style={{ background: 'linear-gradient(135deg, #ff6b35, #ff8555)' }}
-                          >
-                            {item.sizes.length} Sizes
-                          </Badge>
-                        )}
-                      </div>
+                      {item.images && item.images.length > 0 ? (
+                        <Carousel 
+                          interval={null} 
+                          indicators={item.images.length > 1}
+                          controls={item.images.length > 1}
+                          nextIcon={<FaChevronRight />}
+                          prevIcon={<FaChevronLeft />}
+                          style={{ height: '220px' }}
+                        >
+                          {item.images.map((img, idx) => (
+                            <Carousel.Item key={idx}>
+                              <div 
+                                style={{ height: '220px', overflow: 'hidden', cursor: 'pointer' }}
+                                onClick={() => handleViewDetails(item)}
+                              >
+                                <img
+                                  src={img}
+                                  alt={`${item.name} - ${idx + 1}`}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              </div>
+                            </Carousel.Item>
+                          ))}
+                        </Carousel>
+                      ) : (
+                        <div 
+                          style={{ height: '220px', overflow: 'hidden', cursor: 'pointer' }}
+                          onClick={() => handleViewDetails(item)}
+                          className="d-flex align-items-center justify-content-center bg-light"
+                        >
+                          <FaUtensils size={60} className="text-muted" />
+                        </div>
+                      )}
                       
-                      {/* Favorite Button - Only show for logged-in users */}
+                      {item.sizes && item.sizes.length > 0 && (
+                        <Badge 
+                          className="position-absolute top-0 end-0 m-2"
+                          style={{ background: 'linear-gradient(135deg, #ff6b35, #ff8555)' }}
+                        >
+                          {item.sizes.length} Sizes
+                        </Badge>
+                      )}
+                      
+                      {/* Favorite Button */}
                       {user && !isGuest && (
                         <Button
                           variant="link"
@@ -389,7 +399,8 @@ const toggleFavorite = async (foodId: string) => {
                             justifyContent: 'center',
                             padding: 0,
                             border: 'none',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            zIndex: 10
                           }}
                         >
                           {favorites.has(item.id!) ? (
@@ -418,7 +429,7 @@ const toggleFavorite = async (foodId: string) => {
                       </Badge>
                       
                       <p className="text-muted small mb-3">
-                        {item.description.substring(0, 80)}...
+                        {item.description?.substring(0, 80)}...
                       </p>
                       
                       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -469,9 +480,7 @@ const toggleFavorite = async (foodId: string) => {
                 {user && !isGuest && (
                   <Button
                     variant="link"
-                    onClick={() => {
-                      toggleFavorite(detailItem.id!);
-                    }}
+                    onClick={() => toggleFavorite(detailItem.id!)}
                     className="p-0 text-decoration-none"
                   >
                     {favorites.has(detailItem.id!) ? (
@@ -486,11 +495,26 @@ const toggleFavorite = async (foodId: string) => {
             <Modal.Body className="px-4 pb-4">
               <Row>
                 <Col md={6}>
-                  <img
-                    src={detailItem.images?.[0] || '/placeholder.jpg'}
-                    alt={detailItem.name}
-                    style={{ width: '100%', borderRadius: '12px', objectFit: 'cover' }}
-                  />
+                  {/* Product Detail Image Carousel */}
+                  {detailItem.images && detailItem.images.length > 0 ? (
+                    <Carousel interval={null} indicators={detailItem.images.length > 1}>
+                      {detailItem.images.map((img, idx) => (
+                        <Carousel.Item key={idx}>
+                          <img
+                            src={img}
+                            alt={`${detailItem.name} - ${idx + 1}`}
+                            style={{ width: '100%', borderRadius: '12px', objectFit: 'cover', height: '300px' }}
+                          />
+                        </Carousel.Item>
+                      ))}
+                    </Carousel>
+                  ) : (
+                    <img
+                      src="/placeholder.jpg"
+                      alt={detailItem.name}
+                      style={{ width: '100%', borderRadius: '12px', objectFit: 'cover', height: '300px' }}
+                    />
+                  )}
                 </Col>
                 <Col md={6}>
                   <h6 className="fw-bold text-muted">Description</h6>

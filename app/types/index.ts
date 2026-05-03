@@ -22,3 +22,14 @@ export interface Category {
   name: string;
   createdAt: number;
 }
+export interface Trailor {
+  id?: string;
+  name: string;
+  number: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+  address: string;
+  status: 'available' | 'busy' | 'offline';
+  createdAt: number;
+}
